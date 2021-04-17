@@ -168,6 +168,7 @@ class DUMA(nn.Module):
         # mh2 = mh2.view(-1, 4, qa_hidden.shape[1], qa_hidden.shape[2])
         mh1 = F.adaptive_avg_pool2d(mh1, (1, last_hidden_state.shape[2])).squeeze(dim=1)
         mh2 = F.adaptive_avg_pool2d(mh2, (1, last_hidden_state.shape[2])).squeeze(dim=1)
+        # b = torch.nn.functional.adaptive_avg_pool2d(a, (1, 1))  # 自适应池化，指定池化输出尺寸为 1 * 1
 
         mh1 = torch.cat((mh1, mh2), 1)  # torch.Size([8, 1536])
         mh1 = self.co_dropout(mh1)  # torch.Size([8, 1536])
