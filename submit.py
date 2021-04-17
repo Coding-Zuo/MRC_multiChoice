@@ -8,7 +8,7 @@ from transformers import BertForMultipleChoice
 import utils
 import distribute_utils
 from args import init_arg_parser
-import baselineMultGPU
+import TerminalMultGPU
 
 args = init_arg_parser()
 
@@ -51,7 +51,7 @@ def preprocessing_df():
 def test2submit(test_df, model_state_name, model_num, model_name, output_name):
     device = torch.device('cuda')
     test_set = utils.MyDataset(test_df)
-    test_loader = DataLoader(test_set, batch_size=Param['valid_bs'], collate_fn=baselineMultGPU.collate_fn,
+    test_loader = DataLoader(test_set, batch_size=Param['valid_bs'], collate_fn=TerminalMultGPU.collate_fn,
                              shuffle=False,
                              num_workers=Param['num_workers'])
 
