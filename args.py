@@ -58,13 +58,14 @@ def init_arg_parser():
     arg_parser.add_argument('--robert_chinese_pytorch', default='/data2/roberta/robert-chinese-pytorch')
     arg_parser.add_argument('--hfl_chinese_roberta_wwm_ext_large',
                             default='/data2/roberta/hfl_chinese_roberta_wwm_ext_large')
+    arg_parser.add_argument('--longformer_base', default='/data2/pre-model/longformer')
     arg_parser.add_argument('--data_dir', metavar='DIR', default="/home/zuoyuhui/DataGame/haihuai_RC/data/")
     arg_parser.add_argument('--train_path',
                             default="/home/zuoyuhui/DataGame/haihuai_RC/data/train_label.csv")  # 训练集的文件路径
     arg_parser.add_argument('--test_path', default='/home/zuoyuhui/DataGame/haihuai_RC/data/test.csv')  # 测试集的文件路径
     arg_parser.add_argument('--output_path', default='/data2/code/bertBaseDistribute/models')  # 模型输出路径
     arg_parser.add_argument('--stopwords_path', default='/data2/stopword_set/hit_stopwords1.txt')  # 停用词路径
-    arg_parser.add_argument('--save_model_name', default='robert_fgm_early_{}_fold_{}.pt')  # 模型保存名字
+    arg_parser.add_argument('--save_model_name', default='bert_pgd_{}_fold_{}.pt')  # 模型保存名字
 
     # 模型内各种参数
     arg_parser.add_argument('--lr', '--learning-rate', default=1e-5)  # 学习率

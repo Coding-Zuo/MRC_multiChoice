@@ -56,6 +56,7 @@ def init_arg_parser():
     arg_parser.add_argument('--hfl_chinese_roberta_wwm_ext', default='/data2/roberta/hfl_chinese_roberta_wwm_ext')
     arg_parser.add_argument('--RoBERTa_zh_L12', default='/data2/roberta/RoBERTa_zh_L12')
     arg_parser.add_argument('--robert_chinese_pytorch', default='/data2/roberta/robert-chinese-pytorch')
+    arg_parser.add_argument('--longformer_base', default='/data2/pre-model/longformer')
     arg_parser.add_argument('--hfl_chinese_roberta_wwm_ext_large',
                             default='/data2/roberta/hfl_chinese_roberta_wwm_ext_large')
     arg_parser.add_argument('--data_dir', metavar='DIR', default="/home/zuoyuhui/DataGame/haihuai_RC/data/")

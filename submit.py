@@ -106,6 +106,9 @@ if __name__ == '__main__':
     #             model_name="chinese_roformer_base",
     #             output_name="roformer_single_fold5.csv")
     # bert ema fgm 10epoch
-    test2submit(test_df, model_state_name="train/robert_fgm_early_{}_fold_{}.pt", model_num=5,
+    # test2submit(test_df, model_state_name="train/robert_fgm_early_{}_fold_{}.pt", model_num=5,
+    #             model_name="chinese-bert-wwm-ext",
+    #             output_name="bert_ema_10ep_fold5.csv")
+    test2submit(test_df, model_state_name="spawn_adv_pgd_{}_fold_{}.pt", model_num=5,
                 model_name="chinese-bert-wwm-ext",
-                output_name="bert_ema_10ep_fold5.csv")
+                output_name="bert_adv_notr_fold5.csv")

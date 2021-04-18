@@ -45,8 +45,8 @@ parser.add_argument('-b', '--batch_size', default=8, metavar='N')
 parser.add_argument('--lr', '--learning-rate', default=1e-5, metavar='LR', help='initial learning rate')
 parser.add_argument('--max_len', default=256, type=float, help="max text len in bert")
 parser.add_argument('--fold_num', default=5, type=int, metavar='N', help="jiaocha yanzheng")
-parser.add_argument('--seed', default=42, type=int, metavar='N', help="random seed")
-parser.add_argument('--accum_iter', default=2, type=int, metavar='N', help="gradient Accumulation")
+parser.add_argument('--seed', default=2021, type=int, metavar='N', help="random seed")
+parser.add_argument('--accum_iter', default=4, type=int, metavar='N', help="gradient Accumulation")
 parser.add_argument('--weight_decay', default=1e-4, type=float)
 
 tokenizer = BertTokenizer.from_pretrained(parser.parse_args().model)
@@ -74,7 +74,7 @@ def collate_fn(data):  # 将文章问题选项拼在一起后，得到分词后�
 
 def main():
     args = parser.parse_args()
-    args.nprocs = torch.cuda.device_count() - 3
+    args.nprocs = torch.cuda.device_count()
     mp.spawn(main_worker, nprocs=args.nprocs, args=(args.nprocs, args))
 
 
