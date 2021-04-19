@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 from transformers import BertForMultipleChoice
+from bertBaseDistribute import BertModelsCustom
 import utils
 import distribute_utils
 from args import init_arg_parser
@@ -48,14 +49,14 @@ def preprocessing_df():
     return train_df, test_df
 
 
-def test2submit(test_df, model_state_name, model_num, model_name, output_name):
+def test2submit(test_df, model, model_state_name, model_num, model_name, output_name):
     device = torch.device('cuda')
     test_set = utils.MyDataset(test_df)
     test_loader = DataLoader(test_set, batch_size=Param['valid_bs'], collate_fn=TerminalMultGPU.collate_fn,
                              shuffle=False,
                              num_workers=Param['num_workers'])
 
-    model = BertForMultipleChoice.from_pretrained(Param['model']).to(device)
+    model = model.to(device)
     predictions = []
 
     for fold in range(model_num):  # 把训练后的五个模型挨个进行预测
@@ -70,7 +71,8 @@ def test2submit(test_df, model_state_name, model_num, model_name, output_name):
                 input_ids, attention_mask, token_type_ids, y = input_ids.to(device), attention_mask.to(
                     device), token_type_ids.to(device), y.to(device).long()
 
-                output = model(input_ids, attention_mask, token_type_ids).logits.cpu().numpy()
+                output = model(input_ids, attention_mask, token_type_ids)
+                output = output[0].cpu().numpy()
 
                 y_pred.extend(output)
 
@@ -109,6 +111,16 @@ if __name__ == '__main__':
     # test2submit(test_df, model_state_name="train/robert_fgm_early_{}_fold_{}.pt", model_num=5,
     #             model_name="chinese-bert-wwm-ext",
     #             output_name="bert_ema_10ep_fold5.csv")
-    test2submit(test_df, model_state_name="spawn_adv_pgd_{}_fold_{}.pt", model_num=5,
+    # test2submit(test_df, model_state_name="spawn_adv_pgd_{}_fold_{}.pt", model_num=5,
+    #             model_name="chinese-bert-wwm-ext",
+    #             output_name="bert_adv_notr_fold5.csv")
+    bert_3linear = BertModelsCustom.BertForMultipleChoice.from_pretrained(Param['model'])
+
+    # 加三个全连接层
+    # test2submit(test_df, bert_3linear, model_state_name="spawn_3linear_{}_fold_{}.pt", model_num=5,
+    #             model_name="chinese-bert-wwm-ext",
+    #             output_name="bert_3linear_fold5_1.csv")
+    # 数据增强 第二折不收敛 加三个全连接层
+    test2submit(test_df, bert_3linear, model_state_name="spawn_adv_pgd_{}_fold_{}.pt", model_num=4,
                 model_name="chinese-bert-wwm-ext",
-                output_name="bert_adv_notr_fold5.csv")
+                output_name="bert_enhance1.csv")

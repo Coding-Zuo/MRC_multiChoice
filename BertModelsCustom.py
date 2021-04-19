@@ -14,7 +14,9 @@ class BertForMultipleChoice(BertPreTrainedModel):
 
         self.bert = BertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.classifier = nn.Linear(config.hidden_size, 1)
+        self.classifier3 = nn.Linear(config.hidden_size, 512)
+        self.classifier2 = nn.Linear(512, 256)
+        self.classifier1 = nn.Linear(256, 1)
         self.init_weights()
 
     def forward(
@@ -50,7 +52,9 @@ class BertForMultipleChoice(BertPreTrainedModel):
         pooled_output = outputs[1]  # CLS https://www.cnblogs.com/webbery/p/12167552.html
 
         # pooled_output = self.dropout(pooled_output)
-        logits = self.classifier(pooled_output)
+        logits = self.classifier3(pooled_output)
+        logits = self.classifier2(logits)
+        logits = self.classifier1(logits)
         reshaped_logits = logits.view(-1, num_choices)
 
         outputs = (reshaped_logits,) + outputs[2:]  # add hidden states and attention if they are here

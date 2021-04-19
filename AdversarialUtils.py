@@ -7,7 +7,7 @@ class FGM:
         self.model = model
         self.backup = {}
 
-    def attack(self, epsilon=1., emb_name='module.bert1.embeddings.word_embeddings.weight'):
+    def attack(self, epsilon=1., emb_name='module.bert.embeddings.word_embeddings.weight'):
         for name, param in self.model.named_parameters():
             if param.requires_grad and emb_name in name:
                 self.backup[name] = param.data.clone()
@@ -16,7 +16,7 @@ class FGM:
                     r_at = epsilon * param.grad / norm
                     param.data.add_(r_at)
 
-    def restore(self, emb_name='module.bert1.embeddings.word_embeddings.weight'):
+    def restore(self, emb_name='module.bert.embeddings.word_embeddings.weight'):
         for name, param in self.model.named_parameters():
             if param.requires_grad and emb_name in name:
                 assert name in self.backup

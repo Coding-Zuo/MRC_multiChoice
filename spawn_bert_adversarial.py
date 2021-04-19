@@ -40,10 +40,10 @@ parser.add_argument('-m', '--model', default="/home/zuoyuhui/DataGame/haihuai_RC
 parser.add_argument('--data', metavar='DIR', default="/home/zuoyuhui/DataGame/haihuai_RC/data/", help="path to dataset")
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
-parser.add_argument('--epochs', default=8, type=int, metavar='N', help="number of total epochs to run")
+parser.add_argument('--epochs', default=6, type=int, metavar='N', help="number of total epochs to run")
 parser.add_argument('-b', '--batch_size', default=8, metavar='N')
 parser.add_argument('--lr', '--learning-rate', default=1e-5, metavar='LR', help='initial learning rate')
-parser.add_argument('--max_len', default=256, type=float, help="max text len in bert")
+parser.add_argument('--max_len', default=300, type=float, help="max text len in bert")
 parser.add_argument('--fold_num', default=5, type=int, metavar='N', help="jiaocha yanzheng")
 parser.add_argument('--seed', default=2021, type=int, metavar='N', help="random seed")
 parser.add_argument('--accum_iter', default=4, type=int, metavar='N', help="gradient Accumulation")
@@ -74,7 +74,7 @@ def collate_fn(data):  # 将文章问题选项拼在一起后，得到分词后�
 
 def main():
     args = parser.parse_args()
-    args.nprocs = torch.cuda.device_count()
+    args.nprocs = torch.cuda.device_count() - 1
     mp.spawn(main_worker, nprocs=args.nprocs, args=(args.nprocs, args))
 
 
@@ -87,8 +87,8 @@ def main_worker(local_rank, nprocs, args):
                             rank=local_rank)
     torch.cuda.set_device(local_rank)
 
-    train_df = pd.read_csv(args.data + 'train_in.csv')
-    folds = StratifiedKFold(n_splits=args.fold_num, shuffle=True, random_state=args.seed).split(
+    train_df = pd.read_csv(args.data + 'train_label_order_bingpai.csv')
+    folds = StratifiedKFold(n_splits=args.fold_num, shuffle=False).split(
         np.arange(train_df.shape[0]), train_df.label.values)
     cv = []  # 保存每折的最佳准确率
 

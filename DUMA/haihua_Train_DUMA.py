@@ -123,44 +123,6 @@ def collate_fn_cuma(data):
     return input_ids, attention_mask, token_type_ids, label
 
 
-def convert_single_cuma_example(text_a, text_b):
-    token_a_passage_len = args_parser.right_len
-    token_b_qa_len = args_parser.left_len
-    total_len = token_a_passage_len + token_b_qa_len
-
-    tokens_a = tokenizer.tokenize(text_a)
-    tokens_b = tokenizer.tokenize(text_b)  # 这里主要是将中文分字
-    # 如果有第二个句子，那么两个句子的总长度要小于 max_seq_length - 3
-    # 因为要为句子补上[CLS], [SEP], [SEP]
-    _truncate_seq_pair(tokens_a, tokens_b, total_len - 3)
-    tokens = []
-    segment_ids = []
-    tokens.append("[CLS]")
-    segment_ids.append(0)
-    for token in tokens_a:
-        tokens.append(token)
-        segment_ids.append(0)
-    tokens.append("[SEP]")
-    segment_ids.append(0)
-    for token in tokens_b:
-        tokens.append(token)
-        segment_ids.append(1)
-    tokens.append("[SEP]")
-    segment_ids.append(1)
-    input_ids = tokenizer.convert_tokens_to_ids(tokens)  # 将中文转换成ids
-    # 创建mask
-    input_mask = [1] * len(input_ids)
-    # 对于输入进行补0
-    while len(input_ids) < total_len:
-        input_ids.append(0)
-        input_mask.append(0)
-        segment_ids.append(0)
-    assert len(input_ids) == total_len
-    assert len(input_mask) == total_len
-    assert len(segment_ids) == total_len
-    return input_ids, input_mask, segment_ids  # 对应的就是创建bert模型时候的input_ids,input_mask,segment_ids 参数
-
-
 def _truncate_seq_pair(tokens_a, tokens_b, max_length):
     if tokens_b == None:
         len_b = 0
