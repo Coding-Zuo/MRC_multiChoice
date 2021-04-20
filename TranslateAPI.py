@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
-
+import errno
 
 import requests
 import random
@@ -10,18 +10,32 @@ import time
 
 class Trans(object):
     def __init__(self):
-        self.appid = '20210419000788725'
-        self.appkey = '2WeK52AEBcyrqnvAEVCp'
+        self.appid = '20210419000789523'
+        self.appkey = 'z7noSqi7eYDkIWYPW0Fp'
         self.headers = {'Content-Type': 'application/x-www-form-urlencoded'}
         self.salt = random.randint(32768, 65536)
+        requests.adapters.DEFAULT_RETRIES = 5
         self.url = 'http://api.fanyi.baidu.com' + '/api/trans/vip/translate'
 
     def translate(self, content, from_lang, to_lang):
         sign = self.make_md5(self.appid + content + str(self.salt) + self.appkey)
         payload = {'appid': self.appid, 'q': content, 'from': from_lang, 'to': to_lang, 'salt': self.salt, 'sign': sign}
-        r = requests.post(self.url, params=payload, headers=self.headers)
-        time.sleep(1)
+        requests.DEFAULT_RETRIES = 5  # 增加重试连接次数
+        s = requests.session()
+        s.keep_alive = False  # 关闭多余连接
+        try:
+            r = requests.post(self.url, params=payload, headers=self.headers, timeout=300)
+            time.sleep(1)
+        except Exception as e:
+            if e.errno != errno.ECONNRESET:
+                raise
+            pass
+
         result = r.json()
+        if "error_code" in result.keys():
+            print("error!!!!:" + result['error_msg'])
+            return "error!!!!:" + result['error_msg']
+
         result = result['trans_result'][0]['dst']
         return result
 

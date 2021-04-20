@@ -7,7 +7,7 @@ def init_arg_parser():
     # 多卡配置
     arg_parser.add_argument('--mult_gpu', default=True)  # 使用多卡还是单卡
     arg_parser.add_argument('--sigle_device', default=0)  # 单卡的时候使用哪个卡
-    arg_parser.add_argument('--nprocs', default=4, type=int)  # 使用几个卡
+    arg_parser.add_argument('--nprocs', default=2, type=int)  # 使用几个卡
     arg_parser.add_argument('--tcp', default='tcp://127.0.0.1:23456')  # 使用几个卡
     arg_parser.add_argument('--backend', default='nccl')  # 使用几个卡
 
@@ -30,7 +30,7 @@ def init_arg_parser():
     arg_parser.add_argument('--warmup_steps', default=0, type=float)  # warmup_steps
     arg_parser.add_argument('--use_early_stop', default=False)  # 是否早停
     arg_parser.add_argument('--early_stop_num', default=1e-5, type=float)  # 耐心
-    arg_parser.add_argument('--accum_iter', default=8, type=int)  # 梯度累加数量
+    arg_parser.add_argument('--accum_iter', default=16, type=int)  # 梯度累加数量
     arg_parser.add_argument('--num_workers', default=4, type=int)  # pytorch dataloader num_worker 数量
     arg_parser.add_argument('--stop_num', default=4)  # 当评价指标在stop_num内不在增长时，训练停止
     arg_parser.add_argument('--trail_train', default=True)  # 当评价指标在stop_num内不在增长时，训练停止
@@ -65,7 +65,7 @@ def init_arg_parser():
     arg_parser.add_argument('--test_path', default='/home/zuoyuhui/DataGame/haihuai_RC/data/test.csv')  # 测试集的文件路径
     arg_parser.add_argument('--output_path', default='/data2/code/bertBaseDistribute/models')  # 模型输出路径
     arg_parser.add_argument('--stopwords_path', default='/data2/stopword_set/hit_stopwords1.txt')  # 停用词路径
-    arg_parser.add_argument('--save_model_name', default='bert_damu_ema_early_{}_fold_{}.pt')  # 模型保存名字
+    arg_parser.add_argument('--save_model_name', default='bert_lstm_smoothing_{}_fold_{}.pt')  # 模型保存名字
 
     # 模型内各种参数
     arg_parser.add_argument('--lr', '--learning-rate', default=2e-5)  # 学习率
@@ -76,7 +76,7 @@ def init_arg_parser():
     arg_parser.add_argument('--use_bert_dropout', default=False)  # bert输出层dropout
     arg_parser.add_argument('--bert_dropout', default=0.15)  # bert输出层dropout
     arg_parser.add_argument('--bert_dim', default=1024)  # bert的输出向量维度
-    arg_parser.add_argument('--lstm_hidden_dim', default=512)  # lstm的隐藏层
+    arg_parser.add_argument('--lstm_hidden_size', default=512)  # lstm的隐藏层
     arg_parser.add_argument('--bilstm', default=True)  # lstm是否双向
     arg_parser.add_argument('--output_hidden_states', default=True)  # 是否输出隐藏层
     arg_parser.add_argument('--use_cls', default=False)  # 是否使用cls

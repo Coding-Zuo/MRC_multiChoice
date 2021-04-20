@@ -184,5 +184,55 @@ class DUMA(nn.Module):
         return outputs  # (loss), reshaped_logits, (hidden_states), (attentions)
 
 
+class BertForMultipleChoiceBiLSTM(nn.Module):
+    def __init__(self, args, pre_model):
+        super().__init__()
+        self.args = args
+        self.bert_config = BertConfig.from_pretrained(pre_model, output_hidden_states=True)
+        self.bert = BertModel(self.bert_config).from_pretrained(pre_model)
+
+        self.lstm = nn.LSTM(self.bert_config.hidden_size, args.lstm_hidden_size,
+                            num_layers=1, bidirectional=True, batch_first=True)
+        self.gru = nn.GRU(args.lstm_hidden_size * 2, args.lstm_hidden_size,
+                          num_layers=1, bidirectional=True, batch_first=True)
+
+        self.dropout = nn.Dropout(self.bert_config.hidden_dropout_prob)
+        self.classifier = nn.Linear(args.lstm_hidden_size * 2 * 3 + self.bert_config.hidden_size, 1)
+        # self.init_weights()
+
+    def forward(self, input_ids=None, attention_mask=None, token_type_ids=None, position_ids=None, head_mask=None,
+                inputs_embeds=None, labels=None):
+        num_choices = input_ids.shape[1]
+
+        input_ids = input_ids.view(-1, input_ids.size(-1))
+        attention_mask = attention_mask.view(-1, attention_mask.size(-1)) if attention_mask is not None else None
+        token_type_ids = token_type_ids.view(-1, token_type_ids.size(-1)) if token_type_ids is not None else None
+        position_ids = position_ids.view(-1, position_ids.size(-1)) if position_ids is not None else None
+        # 将bert三个输入展平 输入到bertmodel
+        outputs = self.bert(input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids,
+                            position_ids=position_ids, head_mask=head_mask, inputs_embeds=inputs_embeds)
+        # 隐层输出
+        pooled_output = outputs[1]  # torch.Size([16, 768]) CLS https://www.cnblogs.com/webbery/p/12167552.html
+        bert_output = outputs[0]  # torch.Size([16, 400, 768])
+        h_lstm, _ = self.lstm(bert_output)  # [batch_size, seq, output*2] torch.Size([16, 400, 1024])
+        h_gru, hh_gru = self.gru(h_lstm)  # torch.Size([16, 400, 1024])  torch.Size([2, 16, 512])
+        hh_gru = hh_gru.view(-1, 2 * self.args.lstm_hidden_size)  # torch.Size([16, 1024])
+
+        avg_pool = torch.mean(h_gru, 1)  # torch.Size([16, 1024])
+        max_pool = torch.max(h_gru, 1)  # torch.Size([16, 1024])
+
+        # print(h_gru.shape, avg_pool.shape, hh_gru.shape, max_pool.shape, pooled_output.shape)
+        h_conc_a = torch.cat((avg_pool, hh_gru, max_pool.values, pooled_output),
+                             1)  # torch.Size([16, 3840]) 1024*2 + 1024 + 768
+        # print(h_conc_a.shape)
+
+        output = self.dropout(h_conc_a)
+        logits = self.classifier(output)  # torch.Size([16, 1])
+        outputs = nn.functional.softmax(logits, -1)
+        outputs = outputs.view(-1, 4)
+        outputs = (outputs,)
+        return outputs  # (loss), reshaped_logits, (hidden_states), (attentions)
+
+
 if __name__ == '__main__':
     pass

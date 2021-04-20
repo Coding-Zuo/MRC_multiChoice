@@ -13,13 +13,33 @@ args = args.init_arg_parser()
 
 
 def data_enhancement_trans(arg_in):
-    train_df = pd.read_csv(arg_in.train_path)
-    train_df = train_df.drop(['Unnamed: 0', 'num_choices', 'content_len'], axis=1)
-    column = train_df.columns
+    train_df_trans = pd.read_csv(args.data_dir + "train_label_trans.csv")
+    train_df_label = pd.read_csv(args.data_dir + "train_label.csv")
+    train_df_label = train_df_label.iloc[1194:]
+
+    # # 判断断掉时正在处理的Q_id
+    # tail_data_trans = train_df_trans.iloc[-1, :]
+    # tail_data_label = train_df_label.iloc[-1, :]
+    # if tail_data_trans['Q_id'] == tail_data_label['Q_id']:
+    #     print("任务已完成")
+    #     return
+    # else:  # 否则切分数据，切到最后停止时处理的数据
+    #     print("从")
+    #     last_index = train_df_label[train_df_label['Q_id'] == tail_data_trans['Q_id']].index.values[0]
+    #     last_index_label = train_df_label[train_df_label['Q_id'] == tail_data_trans['Q_id']].index.values[0]
+    #     train_df = train_df_label.iloc[last_index:]
+
+    # train_df = train_df.drop(['Unnamed: 0', 'num_choices', 'content_len'], axis=1)
+    column = train_df_label.columns
     train_df_allup = []
     trans = Trans()
     count = 0
-    for i, row in train_df.iterrows():
+
+    last_content = ""
+    last_content_zh = ""
+    last_question = ""
+    last_question_zh = ""
+    for i, row in train_df_label.iterrows():
         row.Content = row.Content.strip().replace(' ', '').replace('\n', '')
         content = row.Content
         question = row.Question
@@ -31,20 +51,62 @@ def data_enhancement_trans(arg_in):
             'Question': row['Question'].replace('\n', ''),
             'Choices': row['Choices'],
             'Answer': row['Answer'], 'label': row['label']}
-        train_df_allup.append(one_data)
+        # train_df_allup.append(one_data)
+        train_df_trans.loc[train_df_trans.shape[0]] = one_data
 
-        en_content = trans.translate(content, from_lang='zh', to_lang='en')
-        zh_content = trans.translate(en_content, from_lang='en', to_lang='zh')
+        if content != last_content:
+            en_content = trans.translate(content, from_lang='zh', to_lang='en')
+            if check_error(en_content):
+                print(en_content)
+                print(1)
+                break
+            zh_content = trans.translate(en_content, from_lang='en', to_lang='zh')
+            last_content_zh = zh_content
+            if check_error(zh_content):
+                print(zh_content)
+                print(2)
+                break
+        else:
+            zh_content = last_content_zh
 
-        en_question = trans.translate(question, from_lang='zh', to_lang='en')
-        zh_question = trans.translate(en_question, from_lang='en', to_lang='zh')
+        if last_question != question:
+            en_question = trans.translate(question, from_lang='zh', to_lang='en')
+            if check_error(en_question):
+                print(en_question)
+                print(3)
+                break
+
+            zh_question = trans.translate(en_question, from_lang='en', to_lang='zh')
+            last_question_zh = zh_question
+            if check_error(zh_question):
+                print(zh_question)
+                print(4)
+                break
+        else:
+            zh_question = last_question_zh
 
         list_choices = choices[2:-2].split('\', \'')
         new_choices = []
+        flag = 0
         for choice in list_choices:
             en_choice = trans.translate(choice, from_lang='zh', to_lang='en')
+            if check_error(en_choice):
+                print(en_choice)
+                flag = 5
+                break
             zh_choice = trans.translate(en_choice, from_lang='en', to_lang='zh')
+            if check_error(zh_choice):
+                print(zh_choice)
+                flag = 6
+                break
             new_choices.append(zh_choice)
+
+        if flag == 5 or flag == 6:
+            print(flag)
+            break
+
+        last_content = content
+        last_question = question
 
         count += 1
         one_data = {
@@ -53,12 +115,20 @@ def data_enhancement_trans(arg_in):
             'Question': zh_question.replace('\n', ''),
             'Choices': str(new_choices),
             'Answer': row['Answer'], 'label': row['label']}
-        print(one_data)
-        train_df_allup.append(one_data)
+        print("count:", count, one_data)
+        # train_df_allup.append(one_data)
+        train_df_trans.loc[train_df_trans.shape[0]] = one_data
+        # df = pd.DataFrame(train_df_allup)
+        train_df_trans.to_csv(args.data_dir + 'train_label_trans.csv', index=False)
 
     print("-------------------------------", count)
-    df = pd.DataFrame(train_df_allup)
-    df.to_csv(args.data_dir + 'train_label_trans.csv', index=False)
+    # df = pd.DataFrame(train_df_allup)
+    # df.to_csv(args.data_dir + 'train_label_trans.csv', index=False)
+    train_df_trans.to_csv(args.data_dir + 'train_label_trans.csv', index=False)
+
+
+def check_error(str):
+    return "error!!!!:" in str
 
 
 def data_enhancement_sentence_order(arg_in):

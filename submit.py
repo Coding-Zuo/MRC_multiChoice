@@ -121,6 +121,10 @@ if __name__ == '__main__':
     #             model_name="chinese-bert-wwm-ext",
     #             output_name="bert_3linear_fold5_1.csv")
     # 数据增强 第二折不收敛 加三个全连接层
-    test2submit(test_df, bert_3linear, model_state_name="spawn_adv_pgd_{}_fold_{}.pt", model_num=4,
+    # test2submit(test_df, bert_3linear, model_state_name="spawn_adv_pgd_{}_fold_{}.pt", model_num=4,
+    #             model_name="chinese-bert-wwm-ext",
+    #             output_name="bert_enhance1.csv")
+    # 五折不打乱  句子乱序
+    test2submit(test_df, bert_3linear, model_state_name="spawn_adv_pgd_{}_fold_{}.pt", model_num=3,
                 model_name="chinese-bert-wwm-ext",
-                output_name="bert_enhance1.csv")
+                output_name="bert_enhance_noShuffle.csv")

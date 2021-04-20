@@ -35,7 +35,7 @@ import AdversarialUtils
 from bertBaseDistribute.DUMA.args import init_arg_parser
 from pytorchtools import EMA, EarlyStopping
 import torchsummary
-from bertBaseDistribute.DUMA.DUMA import DUMA
+from bertBaseDistribute.DUMA.DUMA import DUMA, BertForMultipleChoiceBiLSTM
 
 args_parser = init_arg_parser()
 pre_model = args_parser.bert_chinese_wwm_ext
@@ -169,7 +169,7 @@ def main_worker(local_rank, nprocs, args):
         train_set = utils.MyDataset(train)
         val_set = utils.MyDataset(val)
 
-        model = DUMA(args=args, pre_model=pre_model).cuda(local_rank)
+        model = BertForMultipleChoiceBiLSTM(args=args, pre_model=pre_model).cuda(local_rank)
 
         # get_info_param(model)
         # ema = EMA(model, decay=0.999)
@@ -183,20 +183,29 @@ def main_worker(local_rank, nprocs, args):
             train_batch_sampler = torch.utils.data.BatchSampler(train_sampler, batch_size=args.train_bs,
                                                                 drop_last=True)
             train_loader = DataLoader(train_set, batch_sampler=train_batch_sampler, pin_memory=False,
-                                      collate_fn=collate_fn_cuma, num_workers=2)
+                                      collate_fn=collate_fn, num_workers=2)
             val_loader = DataLoader(val_set, batch_size=args.valid_bs, sampler=val_sampler, pin_memory=False,
-                                    collate_fn=collate_fn_cuma, num_workers=2)
+                                    collate_fn=collate_fn, num_workers=2)
         else:
-            train_loader = DataLoader(train_set, batch_size=args.train_bs, collate_fn=collate_fn_cuma, shuffle=True,
+            train_loader = DataLoader(train_set, batch_size=args.train_bs, collate_fn=collate_fn, shuffle=True,
                                       num_workers=args.num_workers)
-            val_loader = DataLoader(val_set, batch_size=args.valid_bs, collate_fn=collate_fn_cuma, shuffle=False,
+            val_loader = DataLoader(val_set, batch_size=args.valid_bs, collate_fn=collate_fn, shuffle=False,
                                     num_workers=args.num_workers)
 
         best_acc = 0
 
+        fc_para = list(map(id, model.module.classifier.parameters()))
+        lstm_para = list(map(id, model.module.lstm.parameters()))
+        gru_para = list(map(id, model.module.gru.parameters()))
+        base_para = filter(lambda p: id(p) not in fc_para + lstm_para + gru_para, model.module.parameters())
+        params = [{'params': base_para},
+                  {'params': model.module.lstm.parameters(), 'lr': args.other_lr},
+                  {'params': model.module.gru.parameters(), 'lr': args.other_lr},
+                  {'params': model.module.classifier.parameters(), 'lr': args.fc_lr}]
         scaler = GradScaler()
-        optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-        criterion = nn.CrossEntropyLoss().cuda(local_rank)
+        optimizer = AdamW(params, lr=args.lr, weight_decay=args.weight_decay)
+        # criterion = nn.CrossEntropyLoss().cuda(local_rank)
+        criterion = utils.LabelSmoothingCrossEntropy().cuda(local_rank)
 
         # print(len(train_loader))
         # print(len(train_loader) / args.accum_iter)

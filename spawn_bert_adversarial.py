@@ -40,7 +40,7 @@ parser.add_argument('-m', '--model', default="/home/zuoyuhui/DataGame/haihuai_RC
 parser.add_argument('--data', metavar='DIR', default="/home/zuoyuhui/DataGame/haihuai_RC/data/", help="path to dataset")
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
-parser.add_argument('--epochs', default=6, type=int, metavar='N', help="number of total epochs to run")
+parser.add_argument('--epochs', default=8, type=int, metavar='N', help="number of total epochs to run")
 parser.add_argument('-b', '--batch_size', default=8, metavar='N')
 parser.add_argument('--lr', '--learning-rate', default=1e-5, metavar='LR', help='initial learning rate')
 parser.add_argument('--max_len', default=300, type=float, help="max text len in bert")
@@ -74,7 +74,7 @@ def collate_fn(data):  # 将文章问题选项拼在一起后，得到分词后�
 
 def main():
     args = parser.parse_args()
-    args.nprocs = torch.cuda.device_count() - 1
+    args.nprocs = torch.cuda.device_count() - 2
     mp.spawn(main_worker, nprocs=args.nprocs, args=(args.nprocs, args))
 
 
@@ -115,7 +115,8 @@ def main_worker(local_rank, nprocs, args):
 
         scaler = GradScaler()
         optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-        criterion = nn.CrossEntropyLoss().cuda(local_rank)
+        # criterion = nn.CrossEntropyLoss().cuda(local_rank)
+        criterion = utils.LabelSmoothingCrossEntropy().cuda(local_rank)
         scheduler = get_cosine_schedule_with_warmup(optimizer, len(train_loader) // args.accum_iter,
                                                     args.epochs * len(train_loader) // args.accum_iter)
 
