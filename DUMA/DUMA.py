@@ -1,4 +1,7 @@
 # -*- coding:utf-8 -*-
+from transformers import BertModel
+from transformers import BertConfig
+
 from args import init_arg_parser
 import torch.nn as nn
 import numpy as np
@@ -6,8 +9,8 @@ import torch
 import json
 import torch.nn.functional as F
 import copy
-from transformers import BertPreTrainedModel, RobertaModel
-from transformers import BertModel, BertConfig
+# from transformers import BertPreTrainedModel, RobertaModel
+# from transformers import BertModel, BertConfig, RobertaConfig
 from torch.nn import CrossEntropyLoss
 from transformers.modeling_outputs import MultipleChoiceModelOutput
 from transformers.models.roberta.modeling_roberta import RobertaPreTrainedModel
@@ -197,7 +200,7 @@ class BertForMultipleChoiceBiLSTM(nn.Module):
                           num_layers=1, bidirectional=True, batch_first=True)
 
         self.dropout = nn.Dropout(self.bert_config.hidden_dropout_prob)
-        self.classifier = nn.Linear(args.lstm_hidden_size * 2 * 3 + self.bert_config.hidden_size, 1)
+        self.classifier = nn.Linear(self.bert_config.hidden_size, 1)
         # self.init_weights()
 
     def forward(self, input_ids=None, attention_mask=None, token_type_ids=None, position_ids=None, head_mask=None,
@@ -214,6 +217,8 @@ class BertForMultipleChoiceBiLSTM(nn.Module):
         # 隐层输出
         pooled_output = outputs[1]  # torch.Size([16, 768]) CLS https://www.cnblogs.com/webbery/p/12167552.html
         bert_output = outputs[0]  # torch.Size([16, 400, 768])
+        output = self.dropout(pooled_output)
+
         h_lstm, _ = self.lstm(bert_output)  # [batch_size, seq, output*2] torch.Size([16, 400, 1024])
         h_gru, hh_gru = self.gru(h_lstm)  # torch.Size([16, 400, 1024])  torch.Size([2, 16, 512])
         hh_gru = hh_gru.view(-1, 2 * self.args.lstm_hidden_size)  # torch.Size([16, 1024])
@@ -232,6 +237,139 @@ class BertForMultipleChoiceBiLSTM(nn.Module):
         outputs = outputs.view(-1, 4)
         outputs = (outputs,)
         return outputs  # (loss), reshaped_logits, (hidden_states), (attentions)
+
+
+class BertForMultipleChoiceBiLSTM1(nn.Module):
+    def __init__(self, args, pre_model):
+        super().__init__()
+        self.args = args
+        self.bert_config = BertConfig.from_pretrained(pre_model, output_hidden_states=True)
+        self.bert = BertModel(self.bert_config).from_pretrained(pre_model)
+
+        self.lstm = nn.LSTM(self.bert_config.hidden_size, args.lstm_hidden_size,
+                            num_layers=1, bidirectional=True, batch_first=True)
+
+        self.bert_dropout1 = nn.Dropout(0.1)
+        self.bert_dropout2 = nn.Dropout(0.1)
+        self.lstm_dropout = nn.Dropout(0.4)
+        self.classifier = nn.Linear(self.bert_config.hidden_size * 3, 1)
+        # self.init_weights()
+
+    def forward(self, input_ids=None, attention_mask=None, token_type_ids=None, position_ids=None, head_mask=None,
+                inputs_embeds=None, labels=None):
+        num_choices = input_ids.shape[1]
+
+        input_ids = input_ids.view(-1, input_ids.size(-1))
+        attention_mask = attention_mask.view(-1, attention_mask.size(-1)) if attention_mask is not None else None
+        token_type_ids = token_type_ids.view(-1, token_type_ids.size(-1)) if token_type_ids is not None else None
+        position_ids = position_ids.view(-1, position_ids.size(-1)) if position_ids is not None else None
+        # 将bert三个输入展平 输入到bertmodel
+        outputs = self.bert(input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids,
+                            position_ids=position_ids, head_mask=head_mask, inputs_embeds=inputs_embeds)
+        # 隐层输出
+        pooled_output = outputs[1]  # torch.Size([16, 768]) CLS https://www.cnblogs.com/webbery/p/12167552.html
+        bert_output = outputs[0]  # torch.Size([16, 400, 768])
+
+        h_lstm, _ = self.lstm(bert_output)  # [batch_size, seq, output*2] torch.Size([16, 400, 1024])
+        h_lstm = self.lstm_dropout(h_lstm)
+
+        avg_pool = torch.mean(h_lstm, 1)  # torch.Size([16, 1024])
+        max_pool = torch.max(h_lstm, 1)
+        output = torch.cat((avg_pool, max_pool.values, pooled_output), 1)
+
+        logits = self.classifier(output)  # torch.Size([16, 1])
+        outputs = nn.functional.softmax(logits, -1)
+        outputs = outputs.view(-1, 4)
+        outputs = (outputs,)
+        return outputs  # (loss), reshaped_logits, (hidden_states), (attentions)
+
+
+class BertForMultipleChoiceMHA(nn.Module):
+    def __init__(self, args, pre_model):
+        super().__init__()
+        self.args = args
+        self.bert_config = BertConfig.from_pretrained(pre_model, output_hidden_states=True)
+        self.bert = BertModel(self.bert_config).from_pretrained(pre_model)
+
+        # self.mha1 = nn.MultiheadAttention(embed_dim=self.bert_config.hidden_size, num_heads=8)
+        # self.mha2 = nn.MultiheadAttention(embed_dim=self.bert_config.hidden_size, num_heads=8)
+        self.mha1 = MultiHeadSelfAttention(768, 768, 768, num_heads=8)
+        self.mha2 = MultiHeadSelfAttention(768, 768, 768, num_heads=8)
+
+        self.dropout = nn.Dropout(self.bert_config.hidden_dropout_prob)
+        self.classifier = nn.Linear(self.bert_config.hidden_size, 1)
+        # self.init_weights()
+
+    def forward(self, input_ids=None, attention_mask=None, token_type_ids=None, position_ids=None, head_mask=None,
+                inputs_embeds=None, labels=None):
+        num_choices = input_ids.shape[1]
+
+        input_ids = input_ids.view(-1, input_ids.size(-1))
+        attention_mask = attention_mask.view(-1, attention_mask.size(-1)) if attention_mask is not None else None
+        token_type_ids = token_type_ids.view(-1, token_type_ids.size(-1)) if token_type_ids is not None else None
+        position_ids = position_ids.view(-1, position_ids.size(-1)) if position_ids is not None else None
+        # 将bert三个输入展平 输入到bertmodel
+        outputs = self.bert(input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids,
+                            position_ids=position_ids, head_mask=head_mask, inputs_embeds=inputs_embeds)
+        # 隐层输出
+        pooled_output = outputs[1]  # torch.Size([16, 768]) CLS https://www.cnblogs.com/webbery/p/12167552.html
+        bert_output = outputs[0]  # torch.Size([16, 400, 768])
+
+        pooled_output = pooled_output.unsqueeze(dim=1)
+
+        # output = self.mha1(pooled_output, pooled_output, pooled_output)[0]
+        # output = self.mha1(output, output, output)[0]
+        output = self.mha1(pooled_output)
+        output = self.mha2(output)
+
+        output = output.squeeze(1)
+        logits = self.classifier(output)  # torch.Size([16, 1])
+        # outputs = nn.functional.softmax(logits, -1)
+        reshaped_logits = logits.view(-1, 4)
+        outputs = (reshaped_logits,)
+        return outputs  # (loss), reshaped_logits, (hidden_states), (attentions)
+
+
+from math import sqrt
+
+
+class MultiHeadSelfAttention(nn.Module):
+    dim_in: int  # input dimension
+    dim_k: int  # key and query dimension
+    dim_v: int  # value dimension
+    num_heads: int  # number of heads, for each head, dim_* = dim_* // num_heads
+
+    def __init__(self, dim_in, dim_k, dim_v, num_heads=8):
+        super(MultiHeadSelfAttention, self).__init__()
+        assert dim_k % num_heads == 0 and dim_v % num_heads == 0, "dim_k and dim_v must be multiple of num_heads"
+        self.dim_in = dim_in
+        self.dim_k = dim_k
+        self.dim_v = dim_v
+        self.num_heads = num_heads
+        self.linear_q = nn.Linear(dim_in, dim_k, bias=False)
+        self.linear_k = nn.Linear(dim_in, dim_k, bias=False)
+        self.linear_v = nn.Linear(dim_in, dim_v, bias=False)
+        self._norm_fact = 1 / sqrt(dim_k // num_heads)
+
+    def forward(self, x):
+        # x: tensor of shape (batch, n, dim_in)
+        batch, n, dim_in = x.shape
+        assert dim_in == self.dim_in
+
+        nh = self.num_heads
+        dk = self.dim_k // nh  # dim_k of each head
+        dv = self.dim_v // nh  # dim_v of each head
+
+        q = self.linear_q(x).reshape(batch, n, nh, dk).transpose(1, 2)  # (batch, nh, n, dk)
+        k = self.linear_k(x).reshape(batch, n, nh, dk).transpose(1, 2)  # (batch, nh, n, dk)
+        v = self.linear_v(x).reshape(batch, n, nh, dv).transpose(1, 2)  # (batch, nh, n, dv)
+
+        dist = torch.matmul(q, k.transpose(2, 3)) * self._norm_fact  # batch, nh, n, n
+        dist = torch.softmax(dist, dim=-1)  # batch, nh, n, n
+
+        att = torch.matmul(dist, v)  # batch, nh, n, dv
+        att = att.transpose(1, 2).reshape(batch, n, self.dim_v)  # batch, n, dim_v
+        return att
 
 
 if __name__ == '__main__':

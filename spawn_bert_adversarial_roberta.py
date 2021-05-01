@@ -25,7 +25,6 @@ from transformers import AdamW
 import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn.parallel import DistributedDataParallel
-from pytorchtools import EMA
 import utils
 import distribute_utils
 import torch.distributed.launch
@@ -38,19 +37,19 @@ from AdversarialUtils import FGM, PGD
 parser = argparse.ArgumentParser(description='Haihua RC')
 # parser.add_argument('-m', '--model', default="/home/zuoyuhui/DataGame/haihuai_RC/chinese-bert-wwm-ext",
 #                     help="model pretrain")
-parser.add_argument('-m', '--model', default="/home/zuoyuhui/DataGame/haihuai_RC/chinese-bert-wwm-ext",
+parser.add_argument('-m', '--model', default="/data2/roberta/hfl_chinese_roberta_wwm_ext",
                     help="model pretrain")
 parser.add_argument('--data', metavar='DIR', default="/home/zuoyuhui/DataGame/haihuai_RC/data/", help="path to dataset")
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
-parser.add_argument('--epochs', default=8, type=int, metavar='N', help="number of total epochs to run")
-parser.add_argument('-b', '--batch_size', default=8, metavar='N')
-parser.add_argument('--lr', '--learning-rate', default=2e-5, metavar='LR', help='initial learning rate')
+parser.add_argument('--epochs', default=10, type=int, metavar='N', help="number of total epochs to run")
+parser.add_argument('-b', '--batch_size', default=4, metavar='N')
+parser.add_argument('--lr', '--learning-rate', default=1e-5, metavar='LR', help='initial learning rate')
 parser.add_argument('--max_len', default=300, type=float, help="max text len in bert")
 parser.add_argument('--fold_num', default=5, type=int, metavar='N', help="jiaocha yanzheng")
-parser.add_argument('--seed', default=2029, type=int, metavar='N', help="random seed")
+parser.add_argument('--seed', default=2021, type=int, metavar='N', help="random seed")
 parser.add_argument('--accum_iter', default=2, type=int, metavar='N', help="gradient Accumulation")
-parser.add_argument('--weight_decay', default=0.01, type=float)
+parser.add_argument('--weight_decay', default=0.1, type=float)
 
 tokenizer = BertTokenizer.from_pretrained(parser.parse_args().model)
 
@@ -77,21 +76,21 @@ def collate_fn(data):  # 将文章问题选项拼在一起后，得到分词后�
 
 def main():
     args = parser.parse_args()
-    args.nprocs = torch.cuda.device_count() - 2
+    args.nprocs = torch.cuda.device_count() - 3
     mp.spawn(main_worker, nprocs=args.nprocs, args=(args.nprocs, args))
 
 
 def main_worker(local_rank, nprocs, args):
-    args.local_rank = local_rank
-    args.lr *= nprocs
+    args.local_rank = 2
+    args.lr *= 1
     print(args.lr)
     utils.seed_everything(args.seed)
-    dist.init_process_group(backend='nccl', init_method='tcp://127.0.0.1:23456', world_size=args.nprocs,
+    dist.init_process_group(backend='nccl', init_method='tcp://127.0.0.1:12345', world_size=args.nprocs,
                             rank=local_rank)
     torch.cuda.set_device(local_rank)
 
-    train_df = pd.read_csv(args.data + 'train_label_50.csv')
-    folds = StratifiedKFold(n_splits=args.fold_num, shuffle=True, random_state=2029).split(
+    train_df = pd.read_csv(args.data + 'train_label.csv')
+    folds = StratifiedKFold(n_splits=args.fold_num, shuffle=False).split(
         np.arange(train_df.shape[0]), train_df.label.values)
     cv = []  # 保存每折的最佳准确率
 
@@ -101,10 +100,7 @@ def main_worker(local_rank, nprocs, args):
         train_set = utils.MyDataset(train)
         val_set = utils.MyDataset(val)
 
-        model = BertModelsCustom.BertForMultipleChoice.from_pretrained(args.model).cuda(local_rank)
-        # ema = EMA(model, decay=0.9)
-        # ema.register()
-
+        model = BertModelsCustom.RobertaForMultipleChoice.from_pretrained(args.model).cuda(local_rank)
         # args.batch_size = int(args.batch_size / args.nprocs)
         model = DistributedDataParallel(model, device_ids=[local_rank])
 
@@ -121,8 +117,8 @@ def main_worker(local_rank, nprocs, args):
 
         scaler = GradScaler()
         optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-        criterion = nn.CrossEntropyLoss().cuda(local_rank)
-        # criterion = utils.LabelSmoothingCrossEntropy().cuda(local_rank)
+        # criterion = nn.CrossEntropyLoss().cuda(local_rank)
+        criterion = utils.LabelSmoothingCrossEntropy().cuda(local_rank)
         scheduler = get_cosine_schedule_with_warmup(optimizer, len(train_loader) // args.accum_iter,
                                                     args.epochs * len(train_loader) // args.accum_iter)
 
@@ -142,7 +138,7 @@ def main_worker(local_rank, nprocs, args):
                 print("best:", best_acc)
                 if distribute_utils.is_main_process():
                     torch.save(model.module.state_dict(),
-                               'spawn_fgm_addtest77_{}_fold_{}.pt'.format(args.model.split('/')[-1], fold))
+                               'spawn_adv_pgd_{}_fold_{}.pt'.format(args.model.split('/')[-1], fold))
         cv.append(best_acc)
         if distribute_utils.is_main_process():
             print("cv:", np.mean(cv))
@@ -183,7 +179,7 @@ def train_one_epoch(train_loader, model, criterion, optimizer, scheduler, local_
             fgm.restore()  # 恢复embedding参数
 
             # pgd.backup_grad()
-            # # 对抗训练
+            # 对抗训练
             # for t in range(K):
             #     pgd.attack(is_first_attack=(t == 0))  # 在embedding上添加对抗扰动, first attack时备份param.data
             #     if t != K - 1:
@@ -201,7 +197,6 @@ def train_one_epoch(train_loader, model, criterion, optimizer, scheduler, local_
             if ((step + 1) % args.accum_iter == 0) or ((step + 1) == len(train_loader)):
                 scaler.step(optimizer)
                 scaler.update()
-                # ema.update()
                 scheduler.step()
                 optimizer.zero_grad()
 
@@ -219,7 +214,6 @@ def eval_one_epoch(val_loader, model, criterion, local_rank, args):
     losses = utils.AverageMeter('Loss', ':.4e')
     accs = utils.AverageMeter('Acc', ':6.2f')
     model.eval()
-    # ema.apply_shadow()
 
     end = time.time()
     y_truth, y_pred = [], []
@@ -247,7 +241,7 @@ def eval_one_epoch(val_loader, model, criterion, local_rank, args):
         # 等待所有进程计算完毕
         if torch.device(local_rank) != torch.device("cpu"):
             torch.cuda.synchronize(local_rank)
-    # ema.restore()
+
     return losses.avg, accs.avg
 
 

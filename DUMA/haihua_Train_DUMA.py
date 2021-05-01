@@ -1,25 +1,16 @@
 # -*- coding:utf-8 -*-
-import os
-import math
-import tempfile
-import argparse
 
-import json
 import pandas as pd
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
-from torch.cuda.amp import autocast, GradScaler
-import torch.optim as optim
+from torch.cuda.amp import GradScaler
 
 from tqdm import tqdm
 import time
 from sklearn.model_selection import StratifiedKFold
-from transformers import BertTokenizer, AutoTokenizer, BertConfig
-from transformers import BertForMultipleChoice, RobertaForMultipleChoice, RobertaModel
-from transformers import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
+from transformers import BertTokenizer
+from transformers import get_cosine_schedule_with_warmup
 from transformers import AdamW
 
 import torch.distributed as dist
@@ -29,13 +20,12 @@ import utils
 import distribute_utils
 import torch.distributed.launch
 import torch.multiprocessing as mp
-import BertModelsCustom
 from AdversarialUtils import FGM, PGD, FreeLB
 import AdversarialUtils
 from bertBaseDistribute.DUMA.args import init_arg_parser
-from pytorchtools import EMA, EarlyStopping
-import torchsummary
-from bertBaseDistribute.DUMA.DUMA import DUMA, BertForMultipleChoiceBiLSTM
+from bertBaseDistribute.DUMA.DUMA import BertForMultipleChoiceMHA, DUMA
+from LongFormer.LongFormer import LongformerForMultipleChoice
+from pytorchtools import EMA
 
 args_parser = init_arg_parser()
 pre_model = args_parser.bert_chinese_wwm_ext
@@ -169,11 +159,12 @@ def main_worker(local_rank, nprocs, args):
         train_set = utils.MyDataset(train)
         val_set = utils.MyDataset(val)
 
-        model = BertForMultipleChoiceBiLSTM(args=args, pre_model=pre_model).cuda(local_rank)
+        model = DUMA(args=args, pre_model=pre_model).cuda(local_rank)
+        # model = BertModelsCustom.BertForMultipleChoice.from_pretrained(pre_model).cuda(local_rank)
 
         # get_info_param(model)
         # ema = EMA(model, decay=0.999)
-
+        # ema.register()
         if args.mult_gpu:
             model = DistributedDataParallel(model, device_ids=[local_rank], find_unused_parameters=True)
 
@@ -194,16 +185,16 @@ def main_worker(local_rank, nprocs, args):
 
         best_acc = 0
 
-        fc_para = list(map(id, model.module.classifier.parameters()))
-        lstm_para = list(map(id, model.module.lstm.parameters()))
-        gru_para = list(map(id, model.module.gru.parameters()))
-        base_para = filter(lambda p: id(p) not in fc_para + lstm_para + gru_para, model.module.parameters())
-        params = [{'params': base_para},
-                  {'params': model.module.lstm.parameters(), 'lr': args.other_lr},
-                  {'params': model.module.gru.parameters(), 'lr': args.other_lr},
-                  {'params': model.module.classifier.parameters(), 'lr': args.fc_lr}]
+        # fc_para = list(map(id, model.module.classifier.parameters()))
+        # lstm_para = list(map(id, model.module.lstm.parameters()))
+        # gru_para = list(map(id, model.module.gru.parameters()))
+        # base_para = filter(lambda p: id(p) not in fc_para, model.module.parameters())
+        # params = [{'params': base_para},
+        # {'params': model.module.lstm.parameters(), 'lr': args.other_lr},
+        # {'params': model.module.gru.parameters(), 'lr': args.other_lr},
+        # {'params': model.module.classifier.parameters(), 'lr': args.fc_lr}]
         scaler = GradScaler()
-        optimizer = AdamW(params, lr=args.lr, weight_decay=args.weight_decay)
+        optimizer = AdamW(model.module.parameters(), lr=args.lr, weight_decay=args.weight_decay)
         # criterion = nn.CrossEntropyLoss().cuda(local_rank)
         criterion = utils.LabelSmoothingCrossEntropy().cuda(local_rank)
 
@@ -328,6 +319,7 @@ def eval_one_epoch(val_loader, model, criterion, local_rank, args):
     losses = utils.AverageMeter('Loss', ':.4e')
     accs = utils.AverageMeter('Acc', ':6.2f')
     model.eval()
+    # ema.apply_shadow()
 
     end = time.time()
     y_truth, y_pred = [], []
@@ -360,6 +352,7 @@ def eval_one_epoch(val_loader, model, criterion, local_rank, args):
         if torch.device(local_rank) != torch.device("cpu"):
             torch.cuda.synchronize(local_rank)
 
+    # ema.restore()
     return losses.avg, accs.avg
 
 

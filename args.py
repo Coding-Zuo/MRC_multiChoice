@@ -7,13 +7,14 @@ def init_arg_parser():
     # 多卡配置
     arg_parser.add_argument('--mult_gpu', default=True)  # 使用多卡还是单卡
     arg_parser.add_argument('--sigle_device', default=0)  # 单卡的时候使用哪个卡
-    arg_parser.add_argument('--nprocs', default=4, type=int)  # 使用几个卡
+    arg_parser.add_argument('--nprocs', default=2, type=int)  # 使用几个卡
     arg_parser.add_argument('--tcp', default='tcp://127.0.0.1:23456')  # 使用几个卡
     arg_parser.add_argument('--backend', default='nccl')  # 使用几个卡
 
     # 数据预处理时的参数
     arg_parser.add_argument('--train_size', default=0.8)  # 训练集所占比例
     arg_parser.add_argument('--max_len', default=256)  # bert输入句子的最大长度
+    arg_parser.add_argument('--do_lower_case', default=True)
     arg_parser.add_argument('--use_label_smoothing', default=True)  # 是否使用软标签
     arg_parser.add_argument('--label_smooth', default=0.1)  # 软标签阈值
     arg_parser.add_argument('--add_key_words', default=False)  # 是否添加关键词
@@ -60,12 +61,14 @@ def init_arg_parser():
                             default='/data2/roberta/hfl_chinese_roberta_wwm_ext_large')
     arg_parser.add_argument('--longformer_base', default='/data2/pre-model/longformer')
     arg_parser.add_argument('--data_dir', metavar='DIR', default="/home/zuoyuhui/DataGame/haihuai_RC/data/")
+    arg_parser.add_argument('--ensemble_dir', metavar='DIR',
+                            default="/data2/code/bertBaseDistribute/models/ensemble_select")
     arg_parser.add_argument('--train_path',
                             default="/home/zuoyuhui/DataGame/haihuai_RC/data/train_label.csv")  # 训练集的文件路径
     arg_parser.add_argument('--test_path', default='/home/zuoyuhui/DataGame/haihuai_RC/data/test.csv')  # 测试集的文件路径
     arg_parser.add_argument('--output_path', default='/data2/code/bertBaseDistribute/models')  # 模型输出路径
     arg_parser.add_argument('--stopwords_path', default='/data2/stopword_set/hit_stopwords1.txt')  # 停用词路径
-    arg_parser.add_argument('--save_model_name', default='bert_pgd_{}_fold_{}.pt')  # 模型保存名字
+    arg_parser.add_argument('--save_model_name', default='bert_fgm_{}_fold_{}.pt')  # 模型保存名字
 
     # 模型内各种参数
     arg_parser.add_argument('--lr', '--learning-rate', default=1e-5)  # 学习率

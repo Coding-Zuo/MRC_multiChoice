@@ -9,6 +9,7 @@ from bertBaseDistribute import BertModelsCustom
 import utils
 import distribute_utils
 from args import init_arg_parser
+from DUMA import DUMA
 import TerminalMultGPU
 
 args = init_arg_parser()
@@ -115,6 +116,10 @@ if __name__ == '__main__':
     #             model_name="chinese-bert-wwm-ext",
     #             output_name="bert_adv_notr_fold5.csv")
     bert_3linear = BertModelsCustom.BertForMultipleChoice.from_pretrained(Param['model'])
+    roberta = BertModelsCustom.BertForMultipleChoice.from_pretrained("/data2/roberta/hfl_chinese_roberta_wwm_ext")
+    bert_normal = BertModelsCustom.BertForMultipleChoice.from_pretrained(
+        "/home/zuoyuhui/DataGame/haihuai_RC/chinese-bert-wwm-ext")
+    bert_MHA = DUMA.BertForMultipleChoiceMHA(args, "/home/zuoyuhui/DataGame/haihuai_RC/chinese-bert-wwm-ext")
 
     # 加三个全连接层
     # test2submit(test_df, bert_3linear, model_state_name="spawn_3linear_{}_fold_{}.pt", model_num=5,
@@ -125,6 +130,14 @@ if __name__ == '__main__':
     #             model_name="chinese-bert-wwm-ext",
     #             output_name="bert_enhance1.csv")
     # 五折不打乱  句子乱序
-    test2submit(test_df, bert_3linear, model_state_name="spawn_adv_pgd_{}_fold_{}.pt", model_num=3,
+    # test2submit(test_df, roberta, model_state_name="spawn_adv_pgd_{}_fold_{}.pt", model_num=4,
+    #             model_name="hfl_chinese_roberta_wwm_ext",
+    #             output_name="roberta_4flod.csv")
+
+    # pgd
+    # test2submit(test_df, bert_MHA, model_state_name="./DUMA/bert_pgd_mha_{}_fold_{}.pt", model_num=2,
+    #             model_name="chinese-bert-wwm-ext",
+    #             output_name="bert_pgd_mha_ema_flod2.csv")
+    test2submit(test_df, bert_normal, model_state_name="./addtest85_{}_fold_{}.pt", model_num=3,
                 model_name="chinese-bert-wwm-ext",
-                output_name="bert_enhance_noShuffle.csv")
+                output_name="bert_pgd_addtest85.csv")

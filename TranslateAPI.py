@@ -1,17 +1,19 @@
 # -*- coding:utf-8 -*-
 import errno
-
+import http.client
 import requests
 import random
 import json
 from hashlib import md5
 import time
 
+httpClient = None
+
 
 class Trans(object):
     def __init__(self):
-        self.appid = '20210419000789523'
-        self.appkey = 'z7noSqi7eYDkIWYPW0Fp'
+        self.appid = '20180603000171354'
+        self.appkey = '1e_ozkWCRpvPTc5NNW5_'
         self.headers = {'Content-Type': 'application/x-www-form-urlencoded'}
         self.salt = random.randint(32768, 65536)
         requests.adapters.DEFAULT_RETRIES = 5
@@ -30,6 +32,9 @@ class Trans(object):
             if e.errno != errno.ECONNRESET:
                 raise
             pass
+        finally:
+            if httpClient:
+                httpClient.close()
 
         result = r.json()
         if "error_code" in result.keys():

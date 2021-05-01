@@ -98,8 +98,8 @@ def main_worker(local_rank, nprocs, args):
             local_rank)
 
         # get_info_param(model)
-        ema = EMA(model, decay=0.999)
-        ema.register()
+        # ema = EMA(model, decay=0.999)
+        # ema.register()
         early_stopping = EarlyStopping(patience=2)
 
         if args.mult_gpu:
@@ -146,8 +146,8 @@ def main_worker(local_rank, nprocs, args):
                 train_sampler.set_epoch(epoch)
                 val_sampler.set_epoch(epoch)
 
-            train_one_epoch(train_loader, model, criterion, optimizer, scheduler, local_rank, scaler, ema, args)
-            val_loss, val_acc = eval_one_epoch(val_loader, model, criterion, local_rank, ema, args)
+            train_one_epoch(train_loader, model, criterion, optimizer, scheduler, local_rank, scaler, args)
+            val_loss, val_acc = eval_one_epoch(val_loader, model, criterion, local_rank, args)
 
             if args.use_early_stop and distribute_utils.is_main_process():
                 dist.barrier()
@@ -188,7 +188,7 @@ def main_process_call(str):
         print(str)
 
 
-def train_one_epoch(train_loader, model, criterion, optimizer, scheduler, local_rank, scaler, ema, args):
+def train_one_epoch(train_loader, model, criterion, optimizer, scheduler, local_rank, scaler, args):
     batch_time = utils.AverageMeter('Time', ':6.3f')
     data_time = utils.AverageMeter('Data', ':6.3f')
     losses = utils.AverageMeter('Loss', ':.4e')
@@ -250,7 +250,7 @@ def train_one_epoch(train_loader, model, criterion, optimizer, scheduler, local_
             # scaler.update()
             optimizer.step()
             scheduler.step()
-            ema.update()
+            # ema.update()
             optimizer.zero_grad()
 
         if distribute_utils.is_main_process():
@@ -265,11 +265,11 @@ def train_one_epoch(train_loader, model, criterion, optimizer, scheduler, local_
 
 
 @torch.no_grad()
-def eval_one_epoch(val_loader, model, criterion, local_rank, ema, args):
+def eval_one_epoch(val_loader, model, criterion, local_rank, args):
     losses = utils.AverageMeter('Loss', ':.4e')
     accs = utils.AverageMeter('Acc', ':6.2f')
     model.eval()
-    ema.apply_shadow()
+    # ema.apply_shadow()
 
     end = time.time()
     y_truth, y_pred = [], []
@@ -303,7 +303,7 @@ def eval_one_epoch(val_loader, model, criterion, local_rank, ema, args):
         # 等待所有进程计算完毕
         if torch.device(local_rank) != torch.device("cpu"):
             torch.cuda.synchronize(local_rank)
-    ema.restore()
+    # ema.restore()
     return losses.avg, accs.avg
 
 

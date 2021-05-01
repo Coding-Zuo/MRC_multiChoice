@@ -4,6 +4,7 @@ import pandas as pd
 import jieba
 import args
 import os
+import jsonlines
 import random
 import time
 import re
@@ -12,10 +13,49 @@ from TranslateAPI import Trans
 args = args.init_arg_parser()
 
 
+def data_longformer(arg_in, mode="train"):
+    def replace_placeholder(str, opt):
+        list = str.split(' ')
+        for i in range(len(list)):
+            if list[i] == '（）':
+                list[i] = opt
+        final_opt = " ".join(list)
+        return final_opt
+
+    data_list = []
+    labels = []
+    file_path = arg_in.data_dir + "train_baseline.json" if mode == 'train' else arg_in.data_dir + "test_baseline.json"
+    with open(file_path, mode='r') as json_file:
+        reader = jsonlines.Reader(json_file)
+        for instance in reader:
+            article = instance['article'].strip().replace(' ', '').replace('\u3000', '') \
+                .replace('\n', '').replace('\xa0', '')
+            question = instance['question'].replace('\u3000', '') \
+                .replace('\n', '').replace('\xa0', '')
+            opt1 = instance['option_0']
+            opt1 = replace_placeholder(question, opt1)
+            opt2 = instance['option_1']
+            opt2 = replace_placeholder(question, opt2)
+            opt3 = instance['option_2']
+            opt3 = replace_placeholder(question, opt3)
+            opt4 = instance['option_3']
+            opt4 = replace_placeholder(question, opt4)
+
+            data_list.append({
+                'text': article + '[SEP]' + question + '[SEP]' + opt1 + '[SEP]' + opt2 + '[SEP]' + opt3 + '[SEP]' + opt4,
+                'label': instance['label'] if mode == "train" else -1,
+            })
+
+    train_df = pd.DataFrame(data_list)
+    print(train_df.head())
+    print(train_df.size)
+    train_df.to_csv(args.data_dir + mode + '_baseline.csv', index=False)
+
+
 def data_enhancement_trans(arg_in):
     train_df_trans = pd.read_csv(args.data_dir + "train_label_trans.csv")
     train_df_label = pd.read_csv(args.data_dir + "train_label.csv")
-    train_df_label = train_df_label.iloc[1194:]
+    train_df_label = train_df_label.iloc[15263:]
 
     # # 判断断掉时正在处理的Q_id
     # tail_data_trans = train_df_trans.iloc[-1, :]
@@ -390,4 +430,5 @@ def main():
 if __name__ == '__main__':
     # DUMA_pre()
     # data_enhancement_sentence_order_bingpai(args)
-    data_enhancement_trans(args)
+    # data_enhancement_trans(args)
+    data_longformer(args)

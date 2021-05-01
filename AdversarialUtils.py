@@ -7,7 +7,7 @@ class FGM:
         self.model = model
         self.backup = {}
 
-    def attack(self, epsilon=1., emb_name='module.bert.embeddings.word_embeddings.weight'):
+    def attack(self, epsilon=8 / 255, emb_name='module.bert.embeddings.word_embeddings.weight'):
         for name, param in self.model.named_parameters():
             if param.requires_grad and emb_name in name:
                 self.backup[name] = param.data.clone()
@@ -38,7 +38,7 @@ class PGD:
         self.emb_backup = {}
         self.grad_backup = {}
 
-    def attack(self, epsilon=1., alpha=0.3, emb_name='module.bert1.e',
+    def attack(self, epsilon=8 / 255, alpha=10 / 255, emb_name='module.bert.embeddings.word_embeddings.weight',
                is_first_attack=False):
         # emb_name 模型中embedding的参数名
         for name, param in self.model.named_parameters():
@@ -51,7 +51,7 @@ class PGD:
                     param.data.add_(r_at)
                     param.data = self.project(name, param.data, epsilon)
 
-    def restore(self, emb_name='module.bert1.e'):
+    def restore(self, emb_name='module.bert.embeddings.word_embeddings.weight'):
         # emb_name这个参数要换成你模型中embedding的参数名
         for name, param in self.model.named_parameters():
             if param.requires_grad and emb_name in name:
@@ -92,7 +92,7 @@ def pgd_use_bert_adv(pgd, model, input_ids, attention_mask, token_type_ids, y, c
 
 
 class FreeLB(object):
-    def __init__(self, adv_K, adv_lr, adv_init_mag, adv_max_norm=0., adv_norm_type='l2', base_model='bert'):
+    def __init__(self, adv_K, adv_lr, adv_init_mag, adv_max_norm=2e-1, adv_norm_type='l2', base_model='bert'):
         self.adv_K = adv_K
         self.adv_lr = adv_lr
         self.adv_max_norm = adv_max_norm
