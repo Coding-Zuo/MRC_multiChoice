@@ -137,7 +137,7 @@ bert的早停不太好控制，有时候一两个epoch之后还会更新，可�
 
 ### 尝试其他比赛前排模型
 
-![](/Users/zuoyuhui/Library/Application Support/typora-user-images/image-20210501143734325.png)
+![](https://i.loli.net/2021/05/01/f1QIsuWtSVXCcBx.png)
 
 移植后问题：训练集准确率很低，具体问题还需探究。
 
